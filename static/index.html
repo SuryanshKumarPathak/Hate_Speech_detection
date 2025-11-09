@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hate Speech Detection</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #eef2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: #fff;
+      padding: 30px;
+      width: 400px;
+      border-radius: 12px;
+      box-shadow: 0px 0px 25px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #bbb;
+      font-size: 15px;
+      resize: none;
+    }
+
+    button {
+      width: 100%;
+      background: #007bff;
+      color: white;
+      padding: 12px;
+      border: none;
+      margin-top: 10px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0056c1;
+    }
+
+    #voiceBtn {
+      background: #28a745;
+    }
+
+    #voiceBtn:hover {
+      background: #1e7e34;
+    }
+
+    #result {
+      margin-top: 15px;
+      font-size: 18px;
+      padding: 10px;
+      border-radius: 6px;
+      display: none;
+      font-weight: 600;
+    }
+
+    .loading {
+      margin-top: 10px;
+      display: none;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h2>Hate Speech Detection</h2>
+    
+    <textarea id="textInput" placeholder="Type or use voice input..."></textarea>
+    
+    <button onclick="detectHateSpeech()">Check</button>
+    <button id="voiceBtn" onclick="startVoiceInput()">🎤 Voice Input</button>
+
+    <div class="loading" id="loading">Checking...</div>
+    
+    <div id="result"></div>
+  </div>
+
+<script>
+async function detectHateSpeech() {
+    let text = document.getElementById("textInput").value;
+    let resultBox = document.getElementById("result");
+    let loading = document.getElementById("loading");
+
+    if (text.trim() === "") {
+        alert("Please enter or speak some text!");
+        return;
+    }
+
+    loading.style.display = "block";
+    resultBox.style.display = "none";
+
+    try {
+        let response = await fetch("http://127.0.0.1:5000/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: text }),
+        });
+
+        let data = await response.json();
+        let prediction = data.prediction;
+
+        loading.style.display = "none";
+        resultBox.style.display = "block";
+
+        if (prediction.toLowerCase().includes("hate")) {
+            resultBox.textContent = "⚠️ Hate Speech Detected";
+            resultBox.style.background = "#ffdddd";
+            resultBox.style.color = "#d10000";
+        } 
+        else if (prediction.toLowerCase().includes("offensive")) {
+            resultBox.textContent = "⚠️ Offensive Language Detected";
+            resultBox.style.background = "#fff0cc";
+            resultBox.style.color = "#cc7a00";
+        } 
+        else {
+            resultBox.textContent = "✅ Neither Hate nor Offensive";
+            resultBox.style.background = "#ddffdd";
+            resultBox.style.color = "#006600";
+        }
+
+    } catch (error) {
+        loading.style.display = "none";
+        alert("Error connecting to server!");
+    }
+}
+
+// 🎤 Voice Input Function
+function startVoiceInput() {
+  if (!('webkitSpeechRecognition' in window)) {
+    alert("Voice recognition not supported in this browser. Please use Chrome.");
+    return;
+  }
+
+  const recognition = new webkitSpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.start();
+
+  recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    document.getElementById("textInput").value = transcript;
+  };
+
+  recognition.onerror = function(event) {
+    alert("Voice input error: " + event.error);
+  };
+}
+</script>
+
+</body>
+</html>
