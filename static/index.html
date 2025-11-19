@@ -38,6 +38,7 @@
       border: 1px solid #bbb;
       font-size: 15px;
       resize: none;
+      outline: none;
     }
 
     button {
@@ -50,6 +51,7 @@
       border-radius: 8px;
       font-size: 16px;
       cursor: pointer;
+      transition: 0.3s;
     }
 
     button:hover {
@@ -77,6 +79,17 @@
       margin-top: 10px;
       display: none;
       font-size: 14px;
+      color: #555;
+    }
+
+    .recording {
+      background: #ff5e5e !important;
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.1); opacity: 0.8; }
     }
   </style>
 </head>
@@ -91,84 +104,104 @@
     <button onclick="detectHateSpeech()">Check</button>
     <button id="voiceBtn" onclick="startVoiceInput()">🎤 Voice Input</button>
 
-    <div class="loading" id="loading">Checking...</div>
+    <div class="loading" id="loading">⏳ Checking...</div>
     
     <div id="result"></div>
   </div>
 
-<script>
-async function detectHateSpeech() {
-    let text = document.getElementById("textInput").value;
-    let resultBox = document.getElementById("result");
-    let loading = document.getElementById("loading");
+  <script>
+  async function detectHateSpeech() {
+      let text = document.getElementById("textInput").value;
+      let resultBox = document.getElementById("result");
+      let loading = document.getElementById("loading");
 
-    if (text.trim() === "") {
-        alert("Please enter or speak some text!");
-        return;
-    }
+      if (text.trim() === "") {
+          alert("Please enter or speak some text!");
+          return;
+      }
 
-    loading.style.display = "block";
-    resultBox.style.display = "none";
+      loading.style.display = "block";
+      resultBox.style.display = "none";
 
-    try {
-        let response = await fetch("http://127.0.0.1:5000/predict", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: text }),
-        });
+      try {
+          // ✅ Auto-detect backend (local or deployed)
+          let baseURL = window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1")
+              ? "http://127.0.0.1:5000"
+              : "https://hate-speech-detection-ofoh.onrender.com";
 
-        let data = await response.json();
-        let prediction = data.prediction;
+          let response = await fetch(`${baseURL}/predict`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: text }),
+          });
 
-        loading.style.display = "none";
-        resultBox.style.display = "block";
+          if (!response.ok) throw new Error("Server error");
 
-        if (prediction.toLowerCase().includes("hate")) {
-            resultBox.textContent = "⚠️ Hate Speech Detected";
-            resultBox.style.background = "#ffdddd";
-            resultBox.style.color = "#d10000";
-        } 
-        else if (prediction.toLowerCase().includes("offensive")) {
-            resultBox.textContent = "⚠️ Offensive Language Detected";
-            resultBox.style.background = "#fff0cc";
-            resultBox.style.color = "#cc7a00";
-        } 
-        else {
-            resultBox.textContent = "✅ Neither Hate nor Offensive";
-            resultBox.style.background = "#ddffdd";
-            resultBox.style.color = "#006600";
-        }
+          let data = await response.json();
+          let prediction = data.prediction;
 
-    } catch (error) {
-        loading.style.display = "none";
-        alert("Error connecting to server!");
-    }
-}
+          loading.style.display = "none";
+          resultBox.style.display = "block";
 
-// 🎤 Voice Input Function
-function startVoiceInput() {
-  if (!('webkitSpeechRecognition' in window)) {
-    alert("Voice recognition not supported in this browser. Please use Chrome.");
-    return;
+          if (prediction.toLowerCase().includes("hate")) {
+              resultBox.textContent = "⚠️ Hate Speech Detected";
+              resultBox.style.background = "#ffdddd";
+              resultBox.style.color = "#d10000";
+          } 
+          else if (prediction.toLowerCase().includes("offensive")) {
+              resultBox.textContent = "⚠️ Offensive Language Detected";
+              resultBox.style.background = "#fff0cc";
+              resultBox.style.color = "#cc7a00";
+          } 
+          else {
+              resultBox.textContent = "✅ Neither Hate nor Offensive";
+              resultBox.style.background = "#ddffdd";
+              resultBox.style.color = "#006600";
+          }
+
+      } catch (error) {
+          loading.style.display = "none";
+          alert("Error connecting to server!");
+      }
   }
 
-  const recognition = new webkitSpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
+  // 🎤 Voice Input Function
+  function startVoiceInput() {
+    const voiceBtn = document.getElementById("voiceBtn");
 
-  recognition.start();
+    if (!('webkitSpeechRecognition' in window)) {
+      alert("Voice recognition not supported in this browser. Please use Chrome.");
+      return;
+    }
 
-  recognition.onresult = function(event) {
-    const transcript = event.results[0][0].transcript;
-    document.getElementById("textInput").value = transcript;
-  };
+    const recognition = new webkitSpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-  recognition.onerror = function(event) {
-    alert("Voice input error: " + event.error);
-  };
-}
-</script>
+    recognition.start();
+    voiceBtn.classList.add("recording");
+    voiceBtn.textContent = "🎙️ Listening...";
+
+    recognition.onresult = function(event) {
+      const transcript = event.results[0][0].transcript;
+      document.getElementById("textInput").value = transcript;
+      voiceBtn.classList.remove("recording");
+      voiceBtn.textContent = "🎤 Voice Input";
+    };
+
+    recognition.onerror = function(event) {
+      voiceBtn.classList.remove("recording");
+      voiceBtn.textContent = "🎤 Voice Input";
+      alert("Voice input error: " + event.error);
+    };
+
+    recognition.onend = function() {
+      voiceBtn.classList.remove("recording");
+      voiceBtn.textContent = "🎤 Voice Input";
+    };
+  }
+  </script>
 
 </body>
 </html>
